@@ -577,4 +577,100 @@ describe('HireFlow ATS Backend Test Suite', () => {
       expect(withdrawRes.body.data.status).toBe('WITHDRAWN');
     });
   });
+
+  describe('6. Phase 7: Resume Storage, Multer Validation & Parsing', () => {
+    let uploadedResumeId = '';
+    let secondResumeId = '';
+
+    it('should reject resume upload with invalid file extension (400 Bad Request)', async () => {
+      const res = await request(app)
+        .post('/api/v1/resumes/upload')
+        .set('Authorization', `Bearer ${candidateToken}`)
+        .attach('resume', Buffer.from('malicious payload'), 'exploit.exe');
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toMatch(/only pdf, doc, and docx/i);
+    });
+
+    it('should reject upload without a file attached (400 Bad Request)', async () => {
+      const res = await request(app)
+        .post('/api/v1/resumes/upload')
+        .set('Authorization', `Bearer ${candidateToken}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('should successfully upload and parse a valid PDF resume', async () => {
+      // Create a minimal valid PDF header buffer
+      const samplePdfContent = Buffer.from(
+        '%PDF-1.4\n1 0 obj\n<< /Title (Software Engineer Resume) /Author (Candidate) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF'
+      );
+
+      const res = await request(app)
+        .post('/api/v1/resumes/upload')
+        .set('Authorization', `Bearer ${candidateToken}`)
+        .attach('resume', samplePdfContent, 'John_Doe_Lead_Engineer.pdf');
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.fileName).toBe('John_Doe_Lead_Engineer.pdf');
+      expect(res.body.data.fileUrl).toBeDefined();
+      expect(res.body.data.aiAnalysis).toBeDefined();
+      uploadedResumeId = res.body.data._id;
+    });
+
+    it('should allow candidate to retrieve all their uploaded resumes', async () => {
+      const res = await request(app)
+        .get('/api/v1/candidates/resumes')
+        .set('Authorization', `Bearer ${candidateToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.data.some((r) => r._id === uploadedResumeId)).toBe(true);
+    });
+
+    it('should upload a second resume and allow switching primary status', async () => {
+      const samplePdfContent = Buffer.from('%PDF-1.4\nSecond Resume\n%%EOF');
+      const uploadRes = await request(app)
+        .post('/api/v1/resumes/upload')
+        .set('Authorization', `Bearer ${candidateToken}`)
+        .attach('resume', samplePdfContent, 'Alternative_Resume.pdf');
+
+      expect(uploadRes.status).toBe(201);
+      secondResumeId = uploadRes.body.data._id;
+
+      // Set second resume as primary
+      const primaryRes = await request(app)
+        .patch(`/api/v1/resumes/${secondResumeId}/primary`)
+        .set('Authorization', `Bearer ${candidateToken}`);
+
+      expect(primaryRes.status).toBe(200);
+      expect(primaryRes.body.success).toBe(true);
+      expect(primaryRes.body.data.isPrimary).toBe(true);
+
+      // Verify on candidate profile that resumeId updated
+      const candRes = await request(app)
+        .get('/api/v1/candidates/me')
+        .set('Authorization', `Bearer ${candidateToken}`);
+      expect(candRes.body.data.resumeId._id).toBe(secondResumeId);
+    });
+
+    it('should allow candidate to delete a resume', async () => {
+      const delRes = await request(app)
+        .delete(`/api/v1/candidates/resumes/${uploadedResumeId}`)
+        .set('Authorization', `Bearer ${candidateToken}`);
+
+      expect(delRes.status).toBe(200);
+      expect(delRes.body.success).toBe(true);
+
+      // Check it is no longer returned in list
+      const listRes = await request(app)
+        .get('/api/v1/candidates/resumes')
+        .set('Authorization', `Bearer ${candidateToken}`);
+      expect(listRes.body.data.some((r) => r._id === uploadedResumeId)).toBe(false);
+    });
+  });
 });

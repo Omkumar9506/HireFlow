@@ -1,12 +1,31 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+const rawPdfParse = require('pdf-parse');
+const pdfParse = typeof rawPdfParse === 'function' ? rawPdfParse : (rawPdfParse?.default || rawPdfParse);
 import { Resume } from './resume.model.js';
 import { Candidate } from '../candidates/candidate.model.js';
 import { storageService } from '../../services/storage.service.js';
 import { aiService } from '../../services/ai.service.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { logger } from '../../utils/logger.js';
+
+const parsePdfBuffer = async (buffer) => {
+  try {
+    const rawPdfParse = require('pdf-parse');
+    if (typeof rawPdfParse === 'function') {
+      const res = await rawPdfParse(buffer);
+      return res.text || '';
+    }
+    if (rawPdfParse && rawPdfParse.PDFParse) {
+      const parser = new rawPdfParse.PDFParse({ data: buffer });
+      const result = await parser.getText();
+      return typeof result === 'string' ? result : (result?.text || '');
+    }
+  } catch (err) {
+    logger.warn('PDF text extraction error:', err.message);
+  }
+  return buffer.toString('utf8').replace(/[^\x20-\x7E\n]/g, ' ');
+};
 
 export const resumeService = {
   uploadAndParseResume: async (userId, file, isPrimary = false) => {
@@ -15,15 +34,10 @@ export const resumeService = {
 
     if (!file) throw new ApiError(400, 'Resume file is required');
 
-    // Extract text if PDF
+    // Extract text if PDF or documents
     let extractedText = '';
     if (file.mimetype === 'application/pdf') {
-      try {
-        const parsed = await pdfParse(file.buffer);
-        extractedText = parsed.text || '';
-      } catch (err) {
-        logger.warn('PDF text extraction error:', err.message);
-      }
+      extractedText = await parsePdfBuffer(file.buffer);
     } else {
       // Fallback for doc/docx or raw buffer
       extractedText = file.buffer.toString('utf8').replace(/[^\x20-\x7E\n]/g, ' ');

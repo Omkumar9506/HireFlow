@@ -1,10 +1,14 @@
 import { resumeService } from './resume.service.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
+import { ApiError } from '../../utils/ApiError.js';
 import { auditService } from '../admin/audit.service.js';
 
 export const resumeController = {
   uploadResume: async (req, res, next) => {
     try {
+      if (!req.file) {
+        throw new ApiError(400, 'Resume file is required');
+      }
       const isPrimary = req.body.isPrimary === 'true' || req.body.isPrimary === true;
       const resume = await resumeService.uploadAndParseResume(req.user._id, req.file, isPrimary);
 
