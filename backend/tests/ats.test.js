@@ -116,7 +116,69 @@ describe('HireFlow ATS Backend Test Suite', () => {
     });
   });
 
-  describe('2. Job Requisition & Discovery', () => {
+  describe('2. Phase 3: Candidate & Recruiter Profile Management', () => {
+    it('should retrieve logged-in candidate profile with user details', async () => {
+      const res = await request(app)
+        .get('/api/v1/candidates/me')
+        .set('Authorization', `Bearer ${candidateToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.userId).toBeDefined();
+      expect(res.body.data.userId.email).toBe('candidate@hireflow.dev');
+      expect(Array.isArray(res.body.data.skills)).toBe(true);
+    });
+
+    it('should update candidate profile and synchronize user name', async () => {
+      const updatedHeadline = 'Lead Full-Stack Systems Architect';
+      const updatedSkills = ['React', 'Node.js', 'Express', 'MongoDB', 'Docker', 'Kubernetes', 'AWS', 'TypeScript', 'GraphQL'];
+
+      const res = await request(app)
+        .patch('/api/v1/candidates/me')
+        .set('Authorization', `Bearer ${candidateToken}`)
+        .send({
+          headline: updatedHeadline,
+          skills: updatedSkills,
+          bio: 'Passionate engineering lead specializing in high-throughput cloud architectures.',
+          phone: '+1 (555) 987-6543',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.headline).toBe(updatedHeadline);
+      expect(res.body.data.skills).toEqual(expect.arrayContaining(['GraphQL', 'Kubernetes']));
+      expect(res.body.data.phone).toBe('+1 (555) 987-6543');
+    });
+
+    it('should retrieve logged-in recruiter profile with company link', async () => {
+      const res = await request(app)
+        .get('/api/v1/recruiters/me')
+        .set('Authorization', `Bearer ${recruiterToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.userId).toBeDefined();
+      expect(res.body.data.userId.email).toBe('recruiter@hireflow.dev');
+      expect(res.body.data.designation).toBeDefined();
+    });
+
+    it('should update recruiter profile designation and phone', async () => {
+      const res = await request(app)
+        .patch('/api/v1/recruiters/me')
+        .set('Authorization', `Bearer ${recruiterToken}`)
+        .send({
+          designation: 'VP of Global Talent Acquisition',
+          phone: '+1 (415) 555-9988',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.designation).toBe('VP of Global Talent Acquisition');
+      expect(res.body.data.phone).toBe('+1 (415) 555-9988');
+    });
+  });
+
+  describe('3. Job Requisition & Discovery', () => {
     it('should search published jobs with pagination', async () => {
       const res = await request(app).get('/api/v1/jobs?page=1&limit=5');
       expect(res.status).toBe(200);
