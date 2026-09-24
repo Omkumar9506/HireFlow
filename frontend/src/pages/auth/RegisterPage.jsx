@@ -82,8 +82,11 @@ export const RegisterPage = () => {
     } catch (err) {
       const msg =
         err.response?.data?.message ||
+        (err.response?.status === 404
+          ? 'Backend API route not found (404). Please ensure the backend server is reachable.'
+          : null) ||
         (err.message === 'Network Error'
-          ? 'Network Error: Cannot connect to backend API server. Please ensure backend is running.'
+          ? 'Network Error: Cannot connect to backend server. If using Render free tier, it may be waking up—please retry in 10 seconds.'
           : err.message) ||
         'Failed to dispatch verification code. Please try again.';
       setError(msg);
@@ -105,8 +108,11 @@ export const RegisterPage = () => {
     } catch (err) {
       const msg =
         err.response?.data?.message ||
+        (err.response?.status === 404
+          ? 'Backend API route not found (404). Please ensure the backend server is reachable.'
+          : null) ||
         (err.message === 'Network Error'
-          ? 'Network Error: Cannot connect to backend API server.'
+          ? 'Network Error: Cannot connect to backend server. If using Render free tier, it may be waking up—please retry in 10 seconds.'
           : err.message) ||
         'Failed to resend code. Please try again.';
       setError(msg);

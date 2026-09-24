@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { useAuth } from '../store/AuthContext';
 import { ROLES } from '../constants';
 import { ArrowRight, Briefcase } from 'lucide-react';
+import { BACKEND_URL } from '../services/api';
 
 export const PublicLayout = () => {
   const { user, isAuthenticated } = useAuth();
@@ -114,7 +115,7 @@ export const PublicLayout = () => {
                 Platform
               </h4>
               <ul className="space-y-2 text-xs text-slate-600">
-                <li><a href="/api/docs" target="_blank" rel="noreferrer" className="hover:text-blue-600">Swagger API Docs</a></li>
+                <li><a href={`${BACKEND_URL}/api/docs`} target="_blank" rel="noreferrer" className="hover:text-blue-600">Swagger API Docs</a></li>
                 <li><span className="text-slate-400">Security & RBAC</span></li>
                 <li><span className="text-slate-400">Enterprise SLA</span></li>
               </ul>

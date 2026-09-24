@@ -1,7 +1,43 @@
 import axios from 'axios';
 
+// Resolve backend base URL dynamically:
+// 1. If explicit VITE_API_URL is provided and is an absolute URL (e.g. https://...), use it.
+// 2. If running on Vercel or in production, default to the live Render backend: https://hireflow-d5qh.onrender.com/api/v1
+// 3. Otherwise in local Vite development, default to relative '/api/v1' (proxied by Vite to localhost:5000).
+export const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && envUrl.startsWith('http')) {
+    return envUrl;
+  }
+  if (typeof window !== 'undefined' && (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('onrender.com'))) {
+    return 'https://hireflow-d5qh.onrender.com/api/v1';
+  }
+  if (import.meta.env.PROD && (!envUrl || envUrl.startsWith('/'))) {
+    return 'https://hireflow-d5qh.onrender.com/api/v1';
+  }
+  return envUrl || '/api/v1';
+};
+
+export const API_BASE_URL = getApiBaseUrl();
+
+export const getBackendUrl = () => {
+  const envUrl = import.meta.env.VITE_BACKEND_URL;
+  if (envUrl && envUrl.startsWith('http')) {
+    return envUrl;
+  }
+  if (typeof window !== 'undefined' && (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('onrender.com'))) {
+    return 'https://hireflow-d5qh.onrender.com';
+  }
+  if (import.meta.env.PROD) {
+    return 'https://hireflow-d5qh.onrender.com';
+  }
+  return 'http://localhost:5000';
+};
+
+export const BACKEND_URL = getBackendUrl();
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api/v1',
+  baseURL: API_BASE_URL,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -64,7 +100,7 @@ api.interceptors.response.use(
 
       try {
         const res = await axios.post(
-          '/api/v1/auth/refresh',
+          `${API_BASE_URL}/auth/refresh`,
           {},
           { withCredentials: true }
         );

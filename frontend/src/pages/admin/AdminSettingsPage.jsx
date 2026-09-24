@@ -3,6 +3,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/StatusBadge';
 import { Settings, ShieldCheck, FileCode, CheckCircle2, ExternalLink } from 'lucide-react';
+import { BACKEND_URL } from '../../services/api';
 
 export const AdminSettingsPage = () => {
   return (
@@ -28,7 +29,7 @@ export const AdminSettingsPage = () => {
               Explore and test all 30+ backend endpoints, schemas, parameters, and responses interactively.
             </p>
           </div>
-          <a href="http://localhost:5000/api/docs" target="_blank" rel="noreferrer">
+          <a href={`${BACKEND_URL}/api/docs`} target="_blank" rel="noreferrer">
             <Button variant="primary" size="sm" icon={ExternalLink}>
               Launch Swagger UI
             </Button>
