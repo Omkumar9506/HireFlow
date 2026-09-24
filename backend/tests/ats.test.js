@@ -898,4 +898,93 @@ describe('HireFlow ATS Backend Test Suite', () => {
       expect(res.body.data[0].category).toBeDefined();
     });
   });
+
+  describe('10. Phase 11: Admin Suite, Audit Logs & Platform Analytics', () => {
+    let testUserToToggle = '';
+    let adminUserId = '';
+
+    it('should fetch platform analytics overview and pipeline funnel stats', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/stats')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.overview.totalUsers).toBeGreaterThan(0);
+      expect(res.body.data.overview.activeJobs).toBeGreaterThan(0);
+      expect(res.body.data.funnel).toBeDefined();
+      expect(typeof res.body.data.funnel.HIRED).toBe('number');
+    });
+
+    it('should list users with search and role filter', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/users?role=CANDIDATE&limit=10')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data.items)).toBe(true);
+      expect(res.body.data.items.length).toBeGreaterThan(0);
+      testUserToToggle = res.body.data.items[0]._id;
+    });
+
+    it('should toggle user active status and log action in audit trail', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${testUserToToggle}/toggle-status`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data._id).toBe(testUserToToggle);
+
+      // Toggle back to keep database clean
+      await request(app)
+        .patch(`/api/v1/admin/users/${testUserToToggle}/toggle-status`)
+        .set('Authorization', `Bearer ${adminToken}`);
+    });
+
+    it('should prevent admin from deactivating platform administrator account (400 Bad Request)', async () => {
+      // Find admin user
+      const usersRes = await request(app)
+        .get('/api/v1/admin/users?role=ADMIN')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      adminUserId = usersRes.body.data.items[0]._id;
+
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${adminUserId}/toggle-status`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toMatch(/cannot deactivate platform administrator/i);
+    });
+
+    it('should retrieve audit trail with logged actions and actor information', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/audit-logs?limit=10')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data.items)).toBe(true);
+      expect(res.body.data.items.length).toBeGreaterThan(0);
+      expect(res.body.data.items[0].action).toBeDefined();
+    });
+
+    it('should moderate a job by closing it', async () => {
+      const res = await request(app)
+        .post(`/api/v1/admin/jobs/${createdJobId}/moderate`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ action: 'CLOSE' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.message).toMatch(/successfully moderated/i);
+
+      // Check job status is now CLOSED
+      const jobRes = await request(app).get(`/api/v1/jobs/${createdJobId}`);
+      expect(jobRes.body.data.status).toBe('CLOSED');
+    });
+  });
 });
