@@ -770,4 +770,50 @@ describe('HireFlow ATS Backend Test Suite', () => {
       expect(res.body.success).toBe(false);
     });
   });
+
+  describe('8. Phase 9: Notifications & Email Dispatching', () => {
+    let sampleNotificationId = '';
+
+    it('should retrieve logged-in candidate notifications and unread counter', async () => {
+      const res = await request(app)
+        .get('/api/v1/notifications')
+        .set('Authorization', `Bearer ${candidateToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data.notifications)).toBe(true);
+      expect(typeof res.body.data.unreadCount).toBe('number');
+
+      if (res.body.data.notifications.length > 0) {
+        sampleNotificationId = res.body.data.notifications[0]._id;
+      }
+    });
+
+    it('should mark an individual notification as read', async () => {
+      if (!sampleNotificationId) return;
+
+      const res = await request(app)
+        .patch(`/api/v1/notifications/${sampleNotificationId}/read`)
+        .set('Authorization', `Bearer ${candidateToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+
+    it('should mark all candidate notifications as read', async () => {
+      const res = await request(app)
+        .patch('/api/v1/notifications/read-all')
+        .set('Authorization', `Bearer ${candidateToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+
+      // Verify unread count is now 0
+      const listRes = await request(app)
+        .get('/api/v1/notifications')
+        .set('Authorization', `Bearer ${candidateToken}`);
+
+      expect(listRes.body.data.unreadCount).toBe(0);
+    });
+  });
 });
