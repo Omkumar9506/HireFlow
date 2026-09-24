@@ -25,6 +25,42 @@ export const emailService = {
     }
   },
 
+  sendOtpEmail: async (to, name, otp) => {
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; border: 1px solid #E2E8F0; border-radius: 12px; background-color: #FFFFFF;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #1E40AF; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; margin: 0;">HireFlow ATS</h1>
+          <p style="color: #64748B; font-size: 13px; margin-top: 4px;">Account Verification Code</p>
+        </div>
+        <p style="color: #1E293B; font-size: 15px; margin-bottom: 12px;">Hello <strong>${name || 'there'}</strong>,</p>
+        <p style="color: #475569; font-size: 14px; line-height: 1.6; margin-bottom: 24px;">
+          Thank you for choosing HireFlow ATS. Please use the following 6-digit verification code to complete your account registration:
+        </p>
+        <div style="text-align: center; margin: 28px 0;">
+          <div style="display: inline-block; background-color: #EFF6FF; border: 2px dashed #3B82F6; border-radius: 10px; padding: 16px 36px;">
+            <span style="font-family: monospace, Courier; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #1D4ED8;">
+              ${otp}
+            </span>
+          </div>
+        </div>
+        <p style="color: #64748B; font-size: 13px; text-align: center; margin-top: 20px;">
+          This code is valid for <strong>10 minutes</strong>. If you did not request this code, you can safely ignore this email.
+        </p>
+        <hr style="border: 0; border-top: 1px solid #E2E8F0; margin: 28px 0;" />
+        <p style="color: #94A3B8; font-size: 12px; text-align: center; margin: 0;">
+          © ${new Date().getFullYear()} HireFlow ATS. Enterprise Recruitment & Applicant Tracking Platform.
+        </p>
+      </div>
+    `;
+
+    return emailService.sendEmail({
+      to,
+      subject: `${otp} is your HireFlow ATS verification code`,
+      html,
+      text: `Your HireFlow ATS verification code is ${otp}. This code is valid for 10 minutes.`,
+    });
+  },
+
   sendVerificationEmail: async (to, name, token) => {
     const verifyUrl = `${ENV.CLIENT_URL}/verify-email?token=${token}`;
     const html = `

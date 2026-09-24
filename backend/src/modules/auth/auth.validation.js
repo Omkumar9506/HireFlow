@@ -12,6 +12,14 @@ export const validateRegister = (data) => {
   return errors;
 };
 
+export const validateSendOtp = (data) => {
+  const errors = [];
+  if (!data.email || !/^\S+@\S+\.\S+$/.test(data.email)) {
+    errors.push({ field: 'email', message: 'A valid email address is required' });
+  }
+  return errors;
+};
+
 export const validateLogin = (data) => {
   const errors = [];
   if (!data.email || !/^\S+@\S+\.\S+$/.test(data.email)) {

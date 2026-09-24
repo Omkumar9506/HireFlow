@@ -2,10 +2,28 @@ import { Router } from 'express';
 import { authController } from './auth.controller.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { validate } from '../../middleware/validate.js';
-import { validateRegister, validateLogin } from './auth.validation.js';
+import { validateRegister, validateLogin, validateSendOtp } from './auth.validation.js';
 import { authLimiter } from '../../middleware/rateLimiter.js';
 
 const router = Router();
+
+/**
+ * @swagger
+ * /auth/send-otp:
+ *   post:
+ *     summary: Send 6-digit verification code to email for account registration
+ *     tags: [Auth]
+ */
+router.post('/send-otp', authLimiter, validate(validateSendOtp), authController.sendOtp);
+
+/**
+ * @swagger
+ * /auth/verify-otp:
+ *   post:
+ *     summary: Verify 6-digit verification code
+ *     tags: [Auth]
+ */
+router.post('/verify-otp', authLimiter, authController.verifyOtp);
 
 /**
  * @swagger

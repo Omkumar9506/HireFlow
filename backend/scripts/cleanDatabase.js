@@ -13,6 +13,7 @@ import { Interview } from '../src/modules/interviews/interview.model.js';
 import { Notification } from '../src/modules/notifications/notification.model.js';
 import { SavedJob } from '../src/modules/jobs/savedJob.model.js';
 import { AuditLog } from '../src/modules/admin/auditLog.model.js';
+import { Otp } from '../src/modules/auth/otp.model.js';
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/hireflow_ats';
 
@@ -36,6 +37,7 @@ const cleanDatabase = async () => {
       Notification.deleteMany({}),
       SavedJob.deleteMany({}),
       AuditLog.deleteMany({}),
+      Otp.deleteMany({}),
     ]);
 
     console.log('----------------------------------------------------');

@@ -2,12 +2,14 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { User } from './user.model.js';
 import { RefreshToken } from './refreshToken.model.js';
+import { Otp } from './otp.model.js';
 import { Candidate } from '../candidates/candidate.model.js';
 import { Recruiter } from '../recruiters/recruiter.model.js';
 import { ENV } from '../../config/env.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { ROLES } from '../../utils/constants.js';
 import { emailService } from '../../services/email.service.js';
+import { logger } from '../../utils/logger.js';
 
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
@@ -42,8 +44,95 @@ const generateRefreshToken = async (user) => {
 };
 
 export const authService = {
-  register: async ({ name, email, password, role = ROLES.CANDIDATE }) => {
-    const existing = await User.findOne({ email: email.toLowerCase() });
+  sendOtp: async ({ email, name, purpose = 'REGISTRATION' }) => {
+    const cleanEmail = email.toLowerCase().trim();
+
+    if (purpose === 'REGISTRATION') {
+      const existing = await User.findOne({ email: cleanEmail });
+      if (existing) {
+        throw new ApiError(409, 'An account with this email already exists.');
+      }
+    }
+
+    // Rate limiting: check if OTP was created within the last 45 seconds
+    const existingOtp = await Otp.findOne({ email: cleanEmail, purpose });
+    if (existingOtp) {
+      const diffSeconds = (Date.now() - new Date(existingOtp.createdAt).getTime()) / 1000;
+      if (diffSeconds < 45) {
+        throw new ApiError(429, `Please wait ${Math.ceil(45 - diffSeconds)} seconds before requesting a new code.`);
+      }
+      await Otp.deleteMany({ email: cleanEmail, purpose });
+    }
+
+    // Generate 6-digit numeric OTP
+    const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    await Otp.create({
+      email: cleanEmail,
+      otp: rawOtp,
+      purpose,
+    });
+
+    logger.info(`[AUTH OTP] 6-digit code for ${cleanEmail}: [ ${rawOtp} ]`);
+
+    // Send email via configured SMTP (Brevo / console fallback)
+    await emailService.sendOtpEmail(cleanEmail, name, rawOtp);
+
+    return {
+      email: cleanEmail,
+      expiresIn: 600,
+    };
+  },
+
+  verifyOtp: async ({ email, otp, purpose = 'REGISTRATION' }) => {
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanOtp = (otp || '').toString().trim();
+
+    const otpDoc = await Otp.findOne({ email: cleanEmail, purpose });
+    if (!otpDoc) {
+      throw new ApiError(400, 'Verification code has expired or was not requested. Please request a new code.');
+    }
+
+    if (otpDoc.attempts >= 5) {
+      await Otp.deleteOne({ _id: otpDoc._id });
+      throw new ApiError(400, 'Too many failed attempts. Please request a new verification code.');
+    }
+
+    if (otpDoc.otp !== cleanOtp) {
+      otpDoc.attempts += 1;
+      await otpDoc.save();
+      throw new ApiError(400, 'Invalid verification code. Please check your email and try again.');
+    }
+
+    return true;
+  },
+
+  register: async ({ name, email, password, role = ROLES.CANDIDATE, otp }) => {
+    const cleanEmail = email.toLowerCase().trim();
+
+    // If OTP is provided, verify it first and delete upon success
+    if (otp) {
+      const otpDoc = await Otp.findOne({ email: cleanEmail, purpose: 'REGISTRATION' });
+      if (!otpDoc) {
+        throw new ApiError(400, 'Verification code has expired or was not requested. Please request a new code.');
+      }
+
+      if (otpDoc.attempts >= 5) {
+        await Otp.deleteOne({ _id: otpDoc._id });
+        throw new ApiError(400, 'Too many failed attempts. Please request a new verification code.');
+      }
+
+      if (otpDoc.otp !== otp.toString().trim()) {
+        otpDoc.attempts += 1;
+        await otpDoc.save();
+        throw new ApiError(400, 'Invalid verification code. Please check your email and try again.');
+      }
+
+      // Valid OTP! Delete it so it cannot be reused
+      await Otp.deleteOne({ _id: otpDoc._id });
+    }
+
+    const existing = await User.findOne({ email: cleanEmail });
     if (existing) {
       throw new ApiError(409, 'An account with this email already exists.');
     }
@@ -53,11 +142,11 @@ export const authService = {
 
     const user = await User.create({
       name,
-      email: email.toLowerCase(),
+      email: cleanEmail,
       passwordHash,
       role,
       verificationToken: hashToken(verificationToken),
-      isEmailVerified: true, // Auto-verified for smooth onboarding while still having verification endpoints
+      isEmailVerified: true,
     });
 
     // Create profile based on role

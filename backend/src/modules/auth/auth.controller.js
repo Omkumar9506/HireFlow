@@ -13,8 +13,8 @@ const cookieOptions = {
 export const authController = {
   register: async (req, res, next) => {
     try {
-      const { name, email, password, role } = req.body;
-      const result = await authService.register({ name, email, password, role });
+      const { name, email, password, role, otp } = req.body;
+      const result = await authService.register({ name, email, password, role, otp });
 
       res.cookie('refreshToken', result.refreshToken, cookieOptions);
 
@@ -145,6 +145,30 @@ export const authController = {
       return res
         .status(200)
         .json(new ApiResponse(200, null, 'Password reset successful. Please log in with your new password.'));
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  sendOtp: async (req, res, next) => {
+    try {
+      const { email, name, purpose } = req.body;
+      const result = await authService.sendOtp({ email, name, purpose });
+      return res
+        .status(200)
+        .json(new ApiResponse(200, result, 'Verification code sent to your email address'));
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  verifyOtp: async (req, res, next) => {
+    try {
+      const { email, otp, purpose } = req.body;
+      await authService.verifyOtp({ email, otp, purpose });
+      return res
+        .status(200)
+        .json(new ApiResponse(200, null, 'Verification code confirmed successfully'));
     } catch (error) {
       next(error);
     }

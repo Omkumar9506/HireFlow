@@ -57,6 +57,16 @@ export const AuthProvider = ({ children }) => {
     return userData;
   };
 
+  const sendOtp = async (email, name, purpose = 'REGISTRATION') => {
+    const res = await api.post('/auth/send-otp', { email, name, purpose });
+    return res.data;
+  };
+
+  const verifyOtp = async (email, otp, purpose = 'REGISTRATION') => {
+    const res = await api.post('/auth/verify-otp', { email, otp, purpose });
+    return res.data;
+  };
+
   const logout = async () => {
     try {
       await api.post('/auth/logout');
@@ -84,6 +94,8 @@ export const AuthProvider = ({ children }) => {
         isLoading,
         login,
         register,
+        sendOtp,
+        verifyOtp,
         logout,
         updateUser,
       }}
