@@ -63,4 +63,13 @@ router.get('/audit-logs', adminController.getAuditLogs);
  */
 router.post('/jobs/:id/moderate', adminController.moderateJob);
 
+/**
+ * @swagger
+ * /admin/companies/{id}/verify:
+ *   patch:
+ *     summary: Verify or reject company verification request
+ *     tags: [Admin]
+ */
+router.patch('/companies/:id/verify', adminController.verifyCompany);
+
 export default router;

@@ -1,4 +1,5 @@
 import { adminService } from './admin.service.js';
+import { companyService } from '../companies/company.service.js';
 import { ApiResponse } from '../../utils/ApiResponse.js';
 import { auditService } from './audit.service.js';
 
@@ -70,6 +71,24 @@ export const adminController = {
         req,
       });
       return res.status(200).json(new ApiResponse(200, null, `Job successfully moderated (${action})`));
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  verifyCompany: async (req, res, next) => {
+    try {
+      const { status, rejectionReason } = req.body;
+      const company = await companyService.verifyCompany(req.params.id, status, rejectionReason);
+      await auditService.logAction({
+        userId: req.user._id,
+        action: `COMPANY_VERIFICATION_${status}`,
+        entity: 'COMPANY',
+        entityId: company._id,
+        newValue: { status, rejectionReason },
+        req,
+      });
+      return res.status(200).json(new ApiResponse(200, company, `Company verification status updated to ${status}`));
     } catch (error) {
       next(error);
     }

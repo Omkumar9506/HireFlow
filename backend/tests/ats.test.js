@@ -178,7 +178,125 @@ describe('HireFlow ATS Backend Test Suite', () => {
     });
   });
 
-  describe('3. Job Requisition & Discovery', () => {
+  describe('3. Phase 4: Company Profile & Admin Verification Flow', () => {
+    let unapprovedRecruiterToken = '';
+    let pendingCompanyId = '';
+
+    it('should register a new recruiter without an approved company', async () => {
+      const email = `new.recruiter.${Date.now()}@hireflow.dev`;
+      const res = await request(app).post('/api/v1/auth/register').send({
+        name: 'Startup Founder Recruiter',
+        email,
+        password: 'Password123!',
+        role: 'RECRUITER',
+      });
+      expect(res.status).toBe(201);
+      unapprovedRecruiterToken = res.body.data.accessToken;
+    });
+
+    it('should create a new company with PENDING status for the new recruiter', async () => {
+      const compName = `NextGen Labs ${Date.now()}`;
+      const res = await request(app)
+        .post('/api/v1/companies')
+        .set('Authorization', `Bearer ${unapprovedRecruiterToken}`)
+        .send({
+          name: compName,
+          industry: 'Artificial Intelligence',
+          location: 'San Jose, CA',
+          website: 'https://nextgen.example.com',
+          employeeCount: '11-50',
+          foundedYear: 2024,
+          description: 'Autonomous AI agents for enterprise automation.',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.verificationStatus).toBe('PENDING');
+      pendingCompanyId = res.body.data._id;
+    });
+
+    it('should block unapproved company from publishing live jobs (403 Forbidden)', async () => {
+      const res = await request(app)
+        .post('/api/v1/jobs')
+        .set('Authorization', `Bearer ${unapprovedRecruiterToken}`)
+        .send({
+          title: 'Senior AI Engineer',
+          description: 'Building deep learning systems with PyTorch and Transformers.',
+          employmentType: 'FULL_TIME',
+          workMode: 'REMOTE',
+          location: 'San Jose, CA',
+          skills: ['Python', 'PyTorch', 'Docker'],
+          status: 'PUBLISHED', // Attempting to publish without approval
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toMatch(/verified and approved/i);
+    });
+
+    it('should allow unapproved company to save job as DRAFT', async () => {
+      const res = await request(app)
+        .post('/api/v1/jobs')
+        .set('Authorization', `Bearer ${unapprovedRecruiterToken}`)
+        .send({
+          title: 'Draft ML Researcher',
+          description: 'Drafting requirements for next quarter.',
+          employmentType: 'FULL_TIME',
+          workMode: 'REMOTE',
+          location: 'San Jose, CA',
+          skills: ['Python'],
+          status: 'DRAFT',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('DRAFT');
+    });
+
+    it('should allow Admin to list companies and inspect pending verification queue', async () => {
+      const res = await request(app)
+        .get('/api/v1/admin/companies?status=PENDING')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data.items)).toBe(true);
+      const found = res.body.data.items.find((c) => c._id === pendingCompanyId);
+      expect(found).toBeDefined();
+    });
+
+    it('should allow Admin to approve company verification request', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/companies/${pendingCompanyId}/verify`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'APPROVED' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.verificationStatus).toBe('APPROVED');
+    });
+
+    it('should now allow the approved company recruiter to publish live jobs', async () => {
+      const res = await request(app)
+        .post('/api/v1/jobs')
+        .set('Authorization', `Bearer ${unapprovedRecruiterToken}`)
+        .send({
+          title: 'Senior AI Engineer (Live)',
+          description: 'Building deep learning systems with PyTorch and Transformers.',
+          employmentType: 'FULL_TIME',
+          workMode: 'REMOTE',
+          location: 'San Jose, CA',
+          skills: ['Python', 'PyTorch', 'Docker'],
+          status: 'PUBLISHED',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('PUBLISHED');
+    });
+  });
+
+  describe('4. Job Requisition & Discovery', () => {
     it('should search published jobs with pagination', async () => {
       const res = await request(app).get('/api/v1/jobs?page=1&limit=5');
       expect(res.status).toBe(200);
