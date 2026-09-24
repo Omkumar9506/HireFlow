@@ -55,6 +55,49 @@ describe('HireFlow ATS Backend Test Suite', () => {
       candidateId = res.body.data.user.id;
     });
 
+    it('should register a new Candidate account and return tokens and cookies', async () => {
+      const uniqueEmail = `test.candidate.${Date.now()}@hireflow.dev`;
+      const res = await request(app).post('/api/v1/auth/register').send({
+        name: 'New Test Candidate',
+        email: uniqueEmail,
+        password: 'Password123!',
+        role: 'CANDIDATE',
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.user.role).toBe('CANDIDATE');
+      expect(res.body.data.accessToken).toBeDefined();
+      expect(res.headers['set-cookie']).toBeDefined();
+
+      // Test duplicate registration rejection
+      const dupRes = await request(app).post('/api/v1/auth/register').send({
+        name: 'Duplicate',
+        email: uniqueEmail,
+        password: 'Password123!',
+        role: 'CANDIDATE',
+      });
+      expect(dupRes.status).toBe(409);
+      expect(dupRes.body.success).toBe(false);
+    });
+
+    it('should rotate refresh token and issue new access token on refresh', async () => {
+      // Login to get cookies
+      const loginRes = await request(app).post('/api/v1/auth/login').send({
+        email: 'candidate@hireflow.dev',
+        password: 'Password123!',
+      });
+      const cookie = loginRes.headers['set-cookie'];
+
+      const refreshRes = await request(app)
+        .post('/api/v1/auth/refresh')
+        .set('Cookie', cookie);
+
+      expect(refreshRes.status).toBe(200);
+      expect(refreshRes.body.success).toBe(true);
+      expect(refreshRes.body.data.accessToken).toBeDefined();
+      expect(refreshRes.headers['set-cookie']).toBeDefined();
+    });
+
     it('should block Candidate from accessing Admin endpoints (403 Forbidden)', async () => {
       const res = await request(app)
         .get('/api/v1/admin/stats')
