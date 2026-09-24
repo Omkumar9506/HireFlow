@@ -296,22 +296,142 @@ describe('HireFlow ATS Backend Test Suite', () => {
     });
   });
 
-  describe('4. Job Requisition & Discovery', () => {
-    it('should search published jobs with pagination', async () => {
+  describe('4. Phase 5: Job Management, Search, Filtering, Saved Jobs & Pagination', () => {
+    let createdJobId = '';
+
+    it('should search published jobs with faceted filtering and pagination metadata', async () => {
       const res = await request(app).get('/api/v1/jobs?page=1&limit=5');
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data.items)).toBe(true);
       expect(res.body.data.items.length).toBeGreaterThan(0);
+      expect(res.body.data.pagination).toBeDefined();
       expect(res.body.data.pagination.page).toBe(1);
+      expect(res.body.data.pagination.limit).toBe(5);
+      expect(typeof res.body.data.pagination.total).toBe('number');
+      expect(typeof res.body.data.pagination.totalPages).toBe('number');
+      expect(typeof res.body.data.pagination.hasNextPage).toBe('boolean');
       testJobId = res.body.data.items[0]._id;
     });
 
-    it('should fetch single job details', async () => {
-      const res = await request(app)
-        .get(`/api/v1/jobs/${testJobId}`)
-        .set('Authorization', `Bearer ${candidateToken}`);
+    it('should filter jobs by keyword search', async () => {
+      const res = await request(app).get('/api/v1/jobs?search=Engineer');
       expect(res.status).toBe(200);
-      expect(res.body.data.title).toBeDefined();
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.items.length).toBeGreaterThan(0);
+      expect(res.body.data.items.some(j => j.title.toLowerCase().includes('engineer'))).toBe(true);
+    });
+
+    it('should allow recruiter to create a comprehensive job requisition with details', async () => {
+      const res = await request(app)
+        .post('/api/v1/jobs')
+        .set('Authorization', `Bearer ${recruiterToken}`)
+        .send({
+          title: 'Principal Distributed Systems Architect',
+          description: 'Design and scale multi-tenant cloud-native microservices.',
+          responsibilities: [
+            'Architect scalable backend distributed systems',
+            'Lead architectural design reviews and technical roadmaps',
+          ],
+          requirements: [
+            '8+ years of high-concurrency Node.js / Go / Rust experience',
+            'Strong background in distributed consensus algorithms',
+          ],
+          benefits: ['Comprehensive health & dental coverage', '$5,000 annual learning stipend'],
+          employmentType: 'FULL_TIME',
+          workMode: 'HYBRID',
+          location: 'San Francisco, CA',
+          salary: { min: 180000, max: 240000, currency: 'USD', period: 'yearly' },
+          experience: { min: 7, max: 12 },
+          skills: ['Node.js', 'Go', 'Distributed Systems', 'Kubernetes', 'MongoDB'],
+          openings: 2,
+          status: 'PUBLISHED',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.title).toBe('Principal Distributed Systems Architect');
+      expect(res.body.data.salary.min).toBe(180000);
+      createdJobId = res.body.data._id;
+    });
+
+    it('should allow recruiter to update job details', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/jobs/${createdJobId}`)
+        .set('Authorization', `Bearer ${recruiterToken}`)
+        .send({
+          title: 'Staff / Principal Distributed Systems Architect',
+          openings: 3,
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.title).toBe('Staff / Principal Distributed Systems Architect');
+      expect(res.body.data.openings).toBe(3);
+    });
+
+    it('should allow recruiter to close a job requisition', async () => {
+      const res = await request(app)
+        .post(`/api/v1/jobs/${createdJobId}/close`)
+        .set('Authorization', `Bearer ${recruiterToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('CLOSED');
+    });
+
+    it('should allow recruiter to republish a closed job requisition', async () => {
+      const res = await request(app)
+        .post(`/api/v1/jobs/${createdJobId}/publish`)
+        .set('Authorization', `Bearer ${recruiterToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('PUBLISHED');
+    });
+
+    it('should allow candidate to save a job to their saved jobs list', async () => {
+      const res = await request(app)
+        .post(`/api/v1/jobs/${createdJobId}/save`)
+        .set('Authorization', `Bearer ${candidateToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+
+    it('should show isSaved: true when candidate fetches the job details', async () => {
+      const res = await request(app)
+        .get(`/api/v1/jobs/${createdJobId}`)
+        .set('Authorization', `Bearer ${candidateToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.isSaved).toBe(true);
+    });
+
+    it('should list the job in candidate saved jobs', async () => {
+      const res = await request(app)
+        .get('/api/v1/candidates/saved-jobs')
+        .set('Authorization', `Bearer ${candidateToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      const found = res.body.data.find((j) => j._id === createdJobId);
+      expect(found).toBeDefined();
+    });
+
+    it('should allow candidate to unsave the job', async () => {
+      const res = await request(app)
+        .delete(`/api/v1/jobs/${createdJobId}/save`)
+        .set('Authorization', `Bearer ${candidateToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+
+      const checkRes = await request(app)
+        .get(`/api/v1/jobs/${createdJobId}`)
+        .set('Authorization', `Bearer ${candidateToken}`);
+      expect(checkRes.body.data.isSaved).toBe(false);
     });
   });
 
