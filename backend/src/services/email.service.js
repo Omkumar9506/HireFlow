@@ -5,6 +5,43 @@ import { logger } from '../utils/logger.js';
 export const emailService = {
   sendEmail: async ({ to, subject, html, text }) => {
     try {
+      // Check if Brevo API Key is supplied (starts with xkeysib-)
+      if (ENV.SMTP_PASSWORD && ENV.SMTP_PASSWORD.startsWith('xkeysib-')) {
+        const senderMatch = (ENV.SMTP_FROM || '').match(/<([^>]+)>/);
+        const senderEmail = senderMatch ? senderMatch[1] : (ENV.SMTP_USER || 'codeswithom@gmail.com');
+        const senderName = (ENV.SMTP_FROM || '').replace(/<[^>]+>/, '').replace(/"/g, '').trim() || 'HireFlow ATS';
+
+        const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            accept: 'application/json',
+            'api-key': ENV.SMTP_PASSWORD,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            sender: { name: senderName, email: senderEmail },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html,
+            textContent: text || subject,
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          if (errData.message && errData.message.includes('unrecognised IP address')) {
+            logger.error(`[BREVO IP RESTRICTION] Brevo rejected sending because IP address is not whitelisted: ${errData.message}`);
+          } else {
+            logger.error(`Brevo API error sending email to ${to}: ${res.status} - ${JSON.stringify(errData)}`);
+          }
+          return null;
+        }
+
+        const data = await res.json();
+        logger.info(`Email dispatched successfully via Brevo API to ${to}: ${data.messageId}`);
+        return data;
+      }
+
       const mailOptions = {
         from: ENV.SMTP_FROM,
         to,
