@@ -11,6 +11,7 @@ describe('HireFlow ATS Backend Test Suite', () => {
   let candidateId = '';
   let testJobId = '';
   let testApplicationId = '';
+  let createdJobId = '';
 
   beforeAll(async () => {
     await mongoose.connect(ENV.MONGODB_URI);
@@ -297,8 +298,6 @@ describe('HireFlow ATS Backend Test Suite', () => {
   });
 
   describe('4. Phase 5: Job Management, Search, Filtering, Saved Jobs & Pagination', () => {
-    let createdJobId = '';
-
     it('should search published jobs with faceted filtering and pagination metadata', async () => {
       const res = await request(app).get('/api/v1/jobs?page=1&limit=5');
       expect(res.status).toBe(200);
@@ -435,52 +434,147 @@ describe('HireFlow ATS Backend Test Suite', () => {
     });
   });
 
-  describe('3. ATS Application State Machine & Business Rules', () => {
-    it('should prevent duplicate application to the same job', async () => {
-      // Find a job candidate already applied to in seed
-      const jobsRes = await request(app).get('/api/v1/candidates/applications').set('Authorization', `Bearer ${candidateToken}`);
-      if (jobsRes.body.data.length > 0) {
-        const appliedJobId = jobsRes.body.data[0].jobId._id;
-        const res = await request(app)
-          .post(`/api/v1/jobs/${appliedJobId}/apply`)
-          .set('Authorization', `Bearer ${candidateToken}`)
-          .send({ coverLetter: 'Duplicate attempt' });
-        expect(res.status).toBe(409);
-        expect(res.body.success).toBe(false);
-      }
+  describe('5. Phase 6: Applications & ATS Pipeline State Machine', () => {
+    let phase6AppId = '';
+
+    it('should allow candidate to submit a job application', async () => {
+      const res = await request(app)
+        .post(`/api/v1/jobs/${createdJobId}/apply`)
+        .set('Authorization', `Bearer ${candidateToken}`)
+        .send({
+          coverLetter: 'I am highly interested in this distributed systems architect role.',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('APPLIED');
+      phase6AppId = res.body.data._id;
     });
 
-    it('should validate legal status transitions in ATS pipeline', async () => {
-      // Fetch an application in APPLIED status
-      const appsRes = await request(app)
-        .get(`/api/v1/applications/job/${testJobId}`)
+    it('should strictly reject duplicate application to the same job (409 Conflict)', async () => {
+      const res = await request(app)
+        .post(`/api/v1/jobs/${createdJobId}/apply`)
+        .set('Authorization', `Bearer ${candidateToken}`)
+        .send({ coverLetter: 'Duplicate attempt' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toMatch(/already applied/i);
+    });
+
+    it('should allow recruiter to retrieve applications for the job on ATS Kanban board', async () => {
+      const res = await request(app)
+        .get(`/api/v1/applications/job/${createdJobId}`)
         .set('Authorization', `Bearer ${recruiterToken}`);
 
-      if (appsRes.body.data && appsRes.body.data.length > 0) {
-        const appToTest = appsRes.body.data[0];
-        testApplicationId = appToTest._id;
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      const found = res.body.data.find(a => a._id === phase6AppId);
+      expect(found).toBeDefined();
+    });
 
-        // Try invalid transition: e.g. APPLIED -> HIRED directly (skipping interview, offer, etc.)
-        if (appToTest.status === APPLICATION_STATUS.APPLIED) {
-          const invalidRes = await request(app)
-            .patch(`/api/v1/applications/${testApplicationId}/status`)
-            .set('Authorization', `Bearer ${recruiterToken}`)
-            .send({ status: APPLICATION_STATUS.HIRED });
+    it('should allow recruiter to add internal hiring evaluation notes', async () => {
+      const res = await request(app)
+        .post(`/api/v1/applications/${phase6AppId}/notes`)
+        .set('Authorization', `Bearer ${recruiterToken}`)
+        .send({ note: 'Candidate profile shows extensive microservices background. Advancing to screening.' });
 
-          expect(invalidRes.status).toBe(400);
-          expect(invalidRes.body.success).toBe(false);
-          expect(invalidRes.body.message).toContain('Invalid ATS pipeline transition');
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.length).toBeGreaterThan(0);
+      expect(res.body.data[res.body.data.length - 1].note).toContain('Advancing to screening');
+    });
 
-          // Valid transition: APPLIED -> SCREENING
-          const validRes = await request(app)
-            .patch(`/api/v1/applications/${testApplicationId}/status`)
-            .set('Authorization', `Bearer ${recruiterToken}`)
-            .send({ status: APPLICATION_STATUS.SCREENING, reason: 'Passed resume screening' });
+    it('should strictly reject invalid status jumps (e.g. APPLIED -> HIRED directly)', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/applications/${phase6AppId}/status`)
+        .set('Authorization', `Bearer ${recruiterToken}`)
+        .send({ status: 'HIRED' });
 
-          expect(validRes.status).toBe(200);
-          expect(validRes.body.data.status).toBe(APPLICATION_STATUS.SCREENING);
-        }
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toMatch(/Invalid ATS pipeline transition/i);
+    });
+
+    it('should forbid candidate from modifying evaluation stage (403 Forbidden)', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/applications/${phase6AppId}/status`)
+        .set('Authorization', `Bearer ${candidateToken}`)
+        .send({ status: 'SHORTLISTED' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('should advance smoothly through valid state machine transitions: APPLIED -> SCREENING -> SHORTLISTED -> INTERVIEW -> SELECTED -> OFFERED -> HIRED', async () => {
+      const steps = [
+        { next: 'SCREENING', reason: 'Resume matched tech stack' },
+        { next: 'SHORTLISTED', reason: 'Hiring manager approved profile' },
+        { next: 'INTERVIEW', reason: 'Technical loop scheduled' },
+        { next: 'SELECTED', reason: 'Strong interview signals' },
+        { next: 'OFFERED', reason: 'Formal offer extended' },
+        { next: 'HIRED', reason: 'Candidate signed offer letter' },
+      ];
+
+      for (const step of steps) {
+        const res = await request(app)
+          .patch(`/api/v1/applications/${phase6AppId}/status`)
+          .set('Authorization', `Bearer ${recruiterToken}`)
+          .send({ status: step.next, reason: step.reason });
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(true);
+        expect(res.body.data.status).toBe(step.next);
       }
+
+      // Check full audit trail
+      const finalRes = await request(app)
+        .get(`/api/v1/applications/${phase6AppId}`)
+        .set('Authorization', `Bearer ${recruiterToken}`);
+
+      expect(finalRes.status).toBe(200);
+      expect(finalRes.body.data.statusHistory.length).toBe(7);
+      expect(finalRes.body.data.status).toBe('HIRED');
+    });
+
+    it('should prevent any transition from terminal HIRED state', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/applications/${phase6AppId}/status`)
+        .set('Authorization', `Bearer ${recruiterToken}`)
+        .send({ status: 'REJECTED' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/Terminal state/i);
+    });
+
+    it('should allow candidate to withdraw an active application', async () => {
+      const anotherRecruiterJob = await request(app)
+        .post('/api/v1/jobs')
+        .set('Authorization', `Bearer ${recruiterToken}`)
+        .send({
+          title: 'Infrastructure Automation Engineer',
+          description: 'Terraform and AWS infrastructure orchestration.',
+          employmentType: 'FULL_TIME',
+          workMode: 'REMOTE',
+          location: 'San Francisco, CA',
+          skills: ['AWS', 'Terraform'],
+          status: 'PUBLISHED',
+        });
+
+      const applyRes = await request(app)
+        .post(`/api/v1/jobs/${anotherRecruiterJob.body.data._id}/apply`)
+        .set('Authorization', `Bearer ${candidateToken}`)
+        .send({ coverLetter: 'Interested in DevOps' });
+
+      const withdrawRes = await request(app)
+        .patch(`/api/v1/applications/${applyRes.body.data._id}/status`)
+        .set('Authorization', `Bearer ${candidateToken}`)
+        .send({ status: 'WITHDRAWN', reason: 'Accepted another offer' });
+
+      expect(withdrawRes.status).toBe(200);
+      expect(withdrawRes.body.success).toBe(true);
+      expect(withdrawRes.body.data.status).toBe('WITHDRAWN');
     });
   });
 });
