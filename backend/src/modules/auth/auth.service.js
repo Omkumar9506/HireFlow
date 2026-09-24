@@ -81,7 +81,6 @@ export const authService = {
     return {
       email: cleanEmail,
       expiresIn: 600,
-      devOtp: process.env.NODE_ENV !== 'production' ? rawOtp : undefined,
     };
   },
 

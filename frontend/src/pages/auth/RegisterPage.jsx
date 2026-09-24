@@ -75,15 +75,10 @@ export const RegisterPage = () => {
     setIsLoading(true);
 
     try {
-      const res = await sendOtp(email.trim(), name.trim(), 'REGISTRATION');
-      const devOtp = res?.data?.devOtp;
+      await sendOtp(email.trim(), name.trim(), 'REGISTRATION');
       setStep(2);
       setTimer(60);
-      setSuccessMsg(
-        `We dispatched a 6-digit verification code to ${email}.${
-          devOtp ? ` (Local Dev Code: ${devOtp})` : ''
-        }`
-      );
+      setSuccessMsg(`We dispatched a 6-digit verification code to ${email}.`);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to dispatch verification code. Please try again.');
     } finally {
@@ -98,14 +93,9 @@ export const RegisterPage = () => {
     setIsResending(true);
 
     try {
-      const res = await sendOtp(email.trim(), name.trim(), 'REGISTRATION');
-      const devOtp = res?.data?.devOtp;
+      await sendOtp(email.trim(), name.trim(), 'REGISTRATION');
       setTimer(60);
-      setSuccessMsg(
-        `A fresh verification code was dispatched to ${email}.${
-          devOtp ? ` (Local Dev Code: ${devOtp})` : ''
-        }`
-      );
+      setSuccessMsg(`A fresh verification code was dispatched to ${email}.`);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to resend code. Please try again.');
     } finally {
