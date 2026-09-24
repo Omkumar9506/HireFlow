@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import swaggerUi from 'swagger-ui-express';
 
@@ -64,9 +65,13 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // Base Rate Limiting
 app.use('/api/v1', apiLimiter);
 
-// Health check
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+// Health check & probe endpoints (HEAD & GET)
+app.head('/', (req, res) => {
+  res.status(200).end();
+});
+
+app.all(['/health', '/api/v1/health'], (req, res) => {
+  res.status(200).json({ status: 'healthy', service: 'HireFlow ATS API', timestamp: new Date().toISOString() });
 });
 
 // API Routes
@@ -82,15 +87,29 @@ app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/ai', aiRoutes);
 app.use('/api/v1/admin', adminRoutes);
 
-// In production, serve frontend client build
-if (process.env.NODE_ENV === 'production') {
-  const frontendDist = path.resolve(__dirname, '../../frontend/dist');
+// Serve frontend client build if dist exists (All-in-One deployment)
+const frontendDist = path.resolve(__dirname, '../../frontend/dist');
+const indexHtmlPath = path.join(frontendDist, 'index.html');
+
+if (fs.existsSync(indexHtmlPath)) {
   app.use(express.static(frontendDist));
-  app.get('*', (req, res, next) => {
-    if (req.originalUrl.startsWith('/api') || req.originalUrl.startsWith('/health')) {
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' || req.originalUrl.startsWith('/api') || req.originalUrl.startsWith('/health')) {
       return next();
     }
-    res.sendFile(path.join(frontendDist, 'index.html'));
+    res.sendFile(indexHtmlPath);
+  });
+} else {
+  // Standalone API deployment root endpoint
+  app.get('/', (req, res) => {
+    res.status(200).json({
+      success: true,
+      service: 'HireFlow ATS API Gateway',
+      status: 'operational',
+      docs: '/api/docs',
+      health: '/health',
+      timestamp: new Date().toISOString(),
+    });
   });
 }
 
