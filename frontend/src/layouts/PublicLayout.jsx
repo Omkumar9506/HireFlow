@@ -121,9 +121,9 @@ export const PublicLayout = () => {
             </div>
           </div>
           <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
-            <p>© {new Date().getFullYear()} HireFlow ATS. Built with MERN Stack.</p>
+            <p>© {new Date().getFullYear()} HireFlow ATS. Enterprise Recruitment & Applicant Tracking Platform.</p>
             <div className="flex gap-4">
-              <span>Demo Accounts: admin@hireflow.dev | recruiter@hireflow.dev | candidate@hireflow.dev</span>
+              <span>All systems operational</span>
             </div>
           </div>
         </div>

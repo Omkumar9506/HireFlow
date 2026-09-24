@@ -76,30 +76,6 @@ export const AdminSettingsPage = () => {
           </div>
         </div>
       </Card>
-
-      {/* Demo Credentials Reference */}
-      <Card className="p-6">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 mb-3">
-          Seeded Demo Accounts Reference
-        </h3>
-        <div className="grid sm:grid-cols-3 gap-3 text-xs">
-          <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-            <span className="font-bold text-slate-800">Admin</span>
-            <p className="text-slate-600 mt-1 font-mono text-[11px]">admin@hireflow.dev</p>
-            <p className="text-slate-400 font-mono text-[10px]">Password123!</p>
-          </div>
-          <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-            <span className="font-bold text-slate-800">Recruiter</span>
-            <p className="text-slate-600 mt-1 font-mono text-[11px]">recruiter@hireflow.dev</p>
-            <p className="text-slate-400 font-mono text-[10px]">Password123!</p>
-          </div>
-          <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-            <span className="font-bold text-slate-800">Candidate</span>
-            <p className="text-slate-600 mt-1 font-mono text-[11px]">candidate@hireflow.dev</p>
-            <p className="text-slate-400 font-mono text-[10px]">Password123!</p>
-          </div>
-        </div>
-      </Card>
     </div>
   );
 };

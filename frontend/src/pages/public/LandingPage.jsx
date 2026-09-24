@@ -282,7 +282,7 @@ export const LandingPage = () => {
             </Link>
             <Link to="/login">
               <Button size="lg" variant="outline" className="text-slate-900 bg-white hover:bg-slate-100">
-                Log In to Demo
+                Sign In
               </Button>
             </Link>
           </div>

@@ -4,7 +4,7 @@ import { useAuth } from '../../store/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { ROLES } from '../../constants';
-import { Mail, Lock, AlertCircle, Sparkles } from 'lucide-react';
+import { Mail, Lock, AlertCircle } from 'lucide-react';
 
 export const LoginPage = () => {
   const { login } = useAuth();
@@ -39,12 +39,6 @@ export const LoginPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleQuickFill = (demoEmail, demoPassword) => {
-    setEmail(demoEmail);
-    setPassword(demoPassword);
-    setError('');
   };
 
   return (
@@ -104,37 +98,6 @@ export const LoginPage = () => {
           Sign in
         </Button>
       </form>
-
-      {/* Demo Credentials Quick-Fill (As required by section 41) */}
-      <div className="mt-6 pt-6 border-t border-slate-200">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-center gap-1">
-          <Sparkles className="w-3 h-3 text-amber-500" />
-          One-Click Demo Accounts
-        </p>
-        <div className="grid grid-cols-3 gap-2">
-          <button
-            type="button"
-            onClick={() => handleQuickFill('admin@hireflow.dev', 'Password123!')}
-            className="px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] font-semibold text-slate-700 transition-colors"
-          >
-            Admin
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickFill('recruiter@hireflow.dev', 'Password123!')}
-            className="px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] font-semibold text-slate-700 transition-colors"
-          >
-            Recruiter
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickFill('candidate@hireflow.dev', 'Password123!')}
-            className="px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] font-semibold text-slate-700 transition-colors"
-          >
-            Candidate
-          </button>
-        </div>
-      </div>
 
       <p className="mt-6 text-center text-xs text-slate-500">
         Don&apos;t have an account?{' '}
