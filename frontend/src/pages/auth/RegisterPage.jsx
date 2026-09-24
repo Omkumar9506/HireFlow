@@ -80,7 +80,13 @@ export const RegisterPage = () => {
       setTimer(60);
       setSuccessMsg(`We dispatched a 6-digit verification code to ${email}.`);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to dispatch verification code. Please try again.');
+      const msg =
+        err.response?.data?.message ||
+        (err.message === 'Network Error'
+          ? 'Network Error: Cannot connect to backend API server. Please ensure backend is running.'
+          : err.message) ||
+        'Failed to dispatch verification code. Please try again.';
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -97,7 +103,13 @@ export const RegisterPage = () => {
       setTimer(60);
       setSuccessMsg(`A fresh verification code was dispatched to ${email}.`);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to resend code. Please try again.');
+      const msg =
+        err.response?.data?.message ||
+        (err.message === 'Network Error'
+          ? 'Network Error: Cannot connect to backend API server.'
+          : err.message) ||
+        'Failed to resend code. Please try again.';
+      setError(msg);
     } finally {
       setIsResending(false);
     }
@@ -131,7 +143,13 @@ export const RegisterPage = () => {
         navigate('/candidate/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Verification failed. Please check your code.');
+      const msg =
+        err.response?.data?.message ||
+        (err.message === 'Network Error'
+          ? 'Network Error: Cannot connect to backend API server.'
+          : err.message) ||
+        'Verification failed. Please check your code.';
+      setError(msg);
     } finally {
       setIsLoading(false);
     }

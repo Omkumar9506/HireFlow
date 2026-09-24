@@ -36,16 +36,30 @@ const app = express();
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(
   cors({
-    origin: [
-      ENV.CLIENT_URL,
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
-      'http://localhost:5174',
-      'http://127.0.0.1:5174',
-    ],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (ENV.NODE_ENV !== 'production') return callback(null, true);
+      const allowedOrigins = [
+        ENV.CLIENT_URL,
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'http://localhost:5174',
+        'http://127.0.0.1:5174',
+      ].filter(Boolean);
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        origin.endsWith('.onrender.com') ||
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('http://127.0.0.1:')
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   })
 );
 app.use(cookieParser());
