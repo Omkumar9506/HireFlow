@@ -15,8 +15,14 @@ if (isEmailConfigured) {
       user: ENV.SMTP_USER,
       pass: ENV.SMTP_PASSWORD,
     },
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
+    connectionTimeout: 10000,
+    greetingTimeout: 8000,
+    socketTimeout: 12000,
   });
-  logger.info('SMTP transporter configured successfully');
+  logger.info('SMTP transporter configured successfully with connection pooling');
 } else {
   // Mock transporter for local development / testing
   transporter = {

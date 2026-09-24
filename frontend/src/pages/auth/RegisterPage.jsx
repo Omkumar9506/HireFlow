@@ -195,7 +195,16 @@ export const RegisterPage = () => {
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2 text-xs text-red-700">
           <AlertCircle className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
-          <span>{error}</span>
+          <div className="flex-1">
+            <span>{error}</span>
+            {error.includes('already exists') && (
+              <div className="mt-1.5">
+                <Link to="/login" className="font-semibold text-blue-700 underline hover:text-blue-900">
+                  Go to Sign In &rarr;
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -275,7 +284,7 @@ export const RegisterPage = () => {
               isLoading={isLoading}
               icon={ArrowRight}
             >
-              Continue with Email Verification
+              {isLoading ? 'Sending Verification Code...' : 'Continue with Email Verification'}
             </Button>
           </form>
         </div>
