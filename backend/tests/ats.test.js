@@ -673,4 +673,101 @@ describe('HireFlow ATS Backend Test Suite', () => {
       expect(listRes.body.data.some((r) => r._id === uploadedResumeId)).toBe(false);
     });
   });
+
+  describe('7. Phase 8: Interview Management System', () => {
+    let testInterviewId = '';
+    let interviewApplicationId = '';
+
+    beforeAll(async () => {
+      // Find an application owned by the recruiter to schedule interview
+      const appsRes = await request(app)
+        .get(`/api/v1/applications/job/${createdJobId}`)
+        .set('Authorization', `Bearer ${recruiterToken}`);
+
+      if (appsRes.body.data && appsRes.body.data.length > 0) {
+        interviewApplicationId = appsRes.body.data[0]._id;
+      }
+    });
+
+    it('should schedule a new interview and link to application', async () => {
+      const scheduleTime = new Date(Date.now() + 86400000 * 2).toISOString(); // 2 days from now
+      const res = await request(app)
+        .post('/api/v1/interviews')
+        .set('Authorization', `Bearer ${recruiterToken}`)
+        .send({
+          applicationId: interviewApplicationId,
+          type: 'ONLINE',
+          scheduledAt: scheduleTime,
+          duration: 45,
+          meetingLink: 'https://meet.google.com/hfw-live-interview',
+          notes: 'Focus on distributed algorithms and Kubernetes orchestration.',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.type).toBe('ONLINE');
+      expect(res.body.data.status).toBe('SCHEDULED');
+      expect(res.body.data.meetingLink).toBe('https://meet.google.com/hfw-live-interview');
+      testInterviewId = res.body.data._id;
+    });
+
+    it('should allow candidate to list their scheduled interviews', async () => {
+      const res = await request(app)
+        .get('/api/v1/interviews')
+        .set('Authorization', `Bearer ${candidateToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      const found = res.body.data.find((i) => i._id === testInterviewId);
+      expect(found).toBeDefined();
+      expect(found.applicationId).toBeDefined();
+    });
+
+    it('should allow recruiter to reschedule an interview and update status to RESCHEDULED', async () => {
+      const newScheduleTime = new Date(Date.now() + 86400000 * 3).toISOString(); // 3 days from now
+      const res = await request(app)
+        .patch(`/api/v1/interviews/${testInterviewId}`)
+        .set('Authorization', `Bearer ${recruiterToken}`)
+        .send({
+          scheduledAt: newScheduleTime,
+          notes: 'Rescheduled upon candidate availability request.',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('RESCHEDULED');
+    });
+
+    it('should allow recruiter to submit an evaluation rubric and complete interview', async () => {
+      const res = await request(app)
+        .post(`/api/v1/interviews/${testInterviewId}/feedback`)
+        .set('Authorization', `Bearer ${recruiterToken}`)
+        .send({
+          rating: 5,
+          technicalSkillScore: 5,
+          communicationScore: 4,
+          cultureFitScore: 5,
+          strengths: 'Exceptional knowledge of distributed storage and consensus protocols.',
+          weaknesses: 'Minimal experience with Rust but willing to learn.',
+          recommendation: 'STRONG_HIRE',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('COMPLETED');
+      expect(res.body.data.feedback.recommendation).toBe('STRONG_HIRE');
+      expect(res.body.data.feedback.rating).toBe(5);
+    });
+
+    it('should forbid candidate from submitting interview evaluation feedback (403 Forbidden)', async () => {
+      const res = await request(app)
+        .post(`/api/v1/interviews/${testInterviewId}/feedback`)
+        .set('Authorization', `Bearer ${candidateToken}`)
+        .send({ rating: 5, recommendation: 'STRONG_HIRE' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+    });
+  });
 });
