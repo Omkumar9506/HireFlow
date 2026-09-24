@@ -816,4 +816,86 @@ describe('HireFlow ATS Backend Test Suite', () => {
       expect(listRes.body.data.unreadCount).toBe(0);
     });
   });
+
+  describe('9. Phase 10: AI Intelligence & Heuristic Matching Engine', () => {
+    it('should analyze resume text and extract skills, strengths, and suggestions', async () => {
+      const sampleResume = `
+        Jordan Hayes - Senior Software Engineer
+        Skills: React, Node.js, Express, MongoDB, Docker, Kubernetes, AWS, TypeScript
+        Experience: 6 years building distributed systems and high-throughput microservices.
+        Education: B.S. in Computer Science.
+      `;
+
+      const res = await request(app)
+        .post('/api/v1/ai/resume/analyze')
+        .set('Authorization', `Bearer ${candidateToken}`)
+        .send({ text: sampleResume });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data.detectedSkills)).toBe(true);
+      expect(res.body.data.detectedSkills.length).toBeGreaterThan(0);
+      expect(Array.isArray(res.body.data.strengths)).toBe(true);
+      expect(Array.isArray(res.body.data.improvementSuggestions)).toBe(true);
+    });
+
+    it('should reject AI resume analyze when no text or resumeId provided (400 Bad Request)', async () => {
+      const res = await request(app)
+        .post('/api/v1/ai/resume/analyze')
+        .set('Authorization', `Bearer ${candidateToken}`)
+        .send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('should analyze job description and extract requirements, keywords, and experience level', async () => {
+      const res = await request(app)
+        .post('/api/v1/ai/job/analyze')
+        .set('Authorization', `Bearer ${recruiterToken}`)
+        .send({
+          title: 'Senior Cloud DevOps Engineer',
+          description: 'Looking for a senior engineer with deep Docker, Kubernetes, AWS, and CI/CD expertise.',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.requiredSkills).toBeDefined();
+      expect(res.body.data.experienceLevel).toBe('Senior');
+      expect(Array.isArray(res.body.data.keywords)).toBe(true);
+    });
+
+    it('should compute match score between candidate profile and a published job', async () => {
+      const res = await request(app)
+        .post(`/api/v1/ai/job/${createdJobId}/match`)
+        .set('Authorization', `Bearer ${candidateToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(typeof res.body.data.matchScore).toBe('number');
+      expect(res.body.data.matchScore).toBeGreaterThanOrEqual(0);
+      expect(res.body.data.matchScore).toBeLessThanOrEqual(100);
+      expect(Array.isArray(res.body.data.matchedSkills)).toBe(true);
+      expect(Array.isArray(res.body.data.missingSkills)).toBe(true);
+      expect(res.body.data.explanation).toBeDefined();
+    });
+
+    it('should generate tailored interview questions for a role', async () => {
+      const res = await request(app)
+        .post('/api/v1/ai/interview/questions')
+        .set('Authorization', `Bearer ${recruiterToken}`)
+        .send({
+          jobTitle: 'Principal Distributed Systems Architect',
+          skills: ['Node.js', 'Kubernetes', 'MongoDB'],
+          experienceLevel: 'Lead',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.data.length).toBeGreaterThan(0);
+      expect(res.body.data[0].question).toBeDefined();
+      expect(res.body.data[0].category).toBeDefined();
+    });
+  });
 });
