@@ -75,10 +75,12 @@ export const authService = {
 
     logger.info(`[AUTH OTP] 6-digit code for ${cleanEmail}: [ ${rawOtp} ]`);
 
-    // Send email via configured SMTP asynchronously to avoid blocking the user with network latency
-    emailService.sendOtpEmail(cleanEmail, name, rawOtp).catch((err) => {
+    // Send email via configured SMTP
+    try {
+      await emailService.sendOtpEmail(cleanEmail, name, rawOtp);
+    } catch (err) {
       logger.error(`[AUTH OTP ERROR] Failed delivering verification email to ${cleanEmail}: ${err.message}`);
-    });
+    }
 
     return {
       email: cleanEmail,

@@ -1,4 +1,13 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Explicitly load .env from backend directory
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+// Also fallback to process.cwd() .env if present
 dotenv.config();
 
 export const ENV = {
